@@ -17,7 +17,7 @@ def main():
 
     # Check command-line arguments
     if len(sys.argv) not in [2, 3]:
-        sys.exit("Usage: python traffic.py data_directory [model.h5]")
+        sys.exit("Usage: python traffic.py data_directory [model_name.h5]")
 
     # Get image arrays and labels for all image files
     images, labels = load_data(sys.argv[1])
@@ -35,7 +35,7 @@ def main():
     model.fit(x_train, y_train, epochs=EPOCHS)
 
     # Evaluate neural network performance
-    model.evaluate(x_test,  y_test, verbose=2)
+    model.evaluate(x_test, y_test, verbose=2)
 
     # Save model to file
     if len(sys.argv) == 3:
@@ -57,34 +57,43 @@ def load_data(data_dir):
     numpy ndarray with dimensions IMG_WIDTH x IMG_HEIGHT x 3. `labels` should
     be a list of integer labels, representing the categories for each of the
     corresponding `images`.
+
     """
     
-    print(f'Loading images from dataset from directory "{data_dir}"')
+    print(f'Loading images from dataset in directory "{data_dir}"')
 
     images = []
     labels = []
 
-    # Iterate through sign folders in directory:
+    # Iterate through sign folders in directory
     for foldername in os.listdir(data_dir):
-        # Error Checking Data Folder
+        # Exception handling for data folder
         try:
             int(foldername)
         except ValueError:
-            print("Warning! Non-integer folder name in data directory! Skipping...")
+            print("Warning! Non-integer folder name in data directory. Skipping...")
             continue
-        
+
         # Iterate through images in each folder
         for filename in os.listdir(os.path.join(data_dir, foldername)):
-            # Open each image and resize to be IMG_WIDTH X IMG HEIGHT
+            # Open each image and resize to be IMG_WIDTH by IMG_HEIGHT
             img = cv2.imread(os.path.join(data_dir, foldername, filename))
             img = cv2.resize(img, (IMG_WIDTH, IMG_HEIGHT))
 
             # Normalise image pixel intensities
             img = img / 255
 
-            # Append Resized Image and its label to lists
+            # Append resized image and its label to lists
             images.append(img)
             labels.append(int(foldername))
+
+    # Check that the number of images match the number of labels
+    if len(images) != len(labels):
+        sys.exit('Error when loading data, number of images did not match number of labels.')
+    else:
+        print(f'{len(images)}, {len(labels)} labelled images loaded successfully from dataset.')
+    
+    return (images, labels)
 
 
 def get_model():
@@ -93,7 +102,36 @@ def get_model():
     `input_shape` of the first layer is `(IMG_WIDTH, IMG_HEIGHT, 3)`.
     The output layer should have `NUM_CATEGORIES` units, one for each category.
     """
-    raise NotImplementedError
+
+    # Create a sequential neural network using keras
+    model = tf.keras.models.Sequential([
+
+    # Add 2 sequential 64 filter, 3x3 Convolutional Layers Followed by 2x2 Pooling
+    tf.keras.layers.Conv2D(64, (3, 3), activation="relu", input_shape=(IMG_WIDTH, IMG_HEIGHT, 3)),
+    tf.keras.layers.MaxPooling2D(pool_size=(2, 2)),
+    tf.keras.layers.Conv2D(64, (3, 3), activation="relu"),
+    tf.keras.layers.MaxPooling2D(pool_size=(2, 2)),
+
+    # Flatten layers
+    tf.keras.layers.Flatten(),
+
+    # Add A Dense Hidden layer with 512 units and 50% dropout
+    tf.keras.layers.Dense(512, activation="relu"),
+    tf.keras.layers.Dropout(0.5),
+
+    # Add a dense output layer with 43 output units
+    tf.keras.layers.Dense(NUM_CATEGORIES, activation="softmax")
+    ])
+
+    # Set additional model settings and compile
+    model.compile(
+        optimizer='adam',
+        loss='categorical_crossentropy',
+        metrics=['accuracy']
+    )
+
+    # Return model for training and testing
+    return model
 
 
 if __name__ == "__main__":
